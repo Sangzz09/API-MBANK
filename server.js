@@ -1,53 +1,66 @@
 import express from "express";
 import crypto from "crypto";
+import fetch from "node-fetch";
 
 const app = express();
 app.use(express.json());
 
-// ✅ Thay bằng API Secret Key của bạn trên https://my.sepay.vn/api
-const SEPAY_SECRET = "YOUR_SEPAY_SECRET_KEY";
+// === CẤU HÌNH CỦA BẠN ===
+const SEPAY_SECRET = "YOUR_SEPAY_SECRET_KEY";  // Lấy trong my.sepay.vn -> API Key
+const TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN";
+const TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID";
 
-// ✅ Route webhook
-app.post("/api/sepay/webhook", (req, res) => {
+// === HÀM GỬI TELEGRAM ===
+async function sendTelegramMessage(text) {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: "Markdown"
+    }),
+  });
+}
+
+// === WEBHOOK SEPAY ===
+app.post("/api/sepay/webhook", async (req, res) => {
   const data = req.body;
   const signature = req.headers["x-sepay-signature"];
 
-  // ✅ Tạo hash để xác thực tính toàn vẹn
   const hash = crypto
     .createHmac("sha256", SEPAY_SECRET)
     .update(JSON.stringify(data))
     .digest("hex");
 
   if (hash !== signature) {
-    console.log("❌ Sai chữ ký, bỏ qua webhook không hợp lệ.");
+    console.log("❌ Sai chữ ký webhook!");
     return res.status(401).send("Invalid signature");
   }
 
-  // ✅ Xử lý khi có giao dịch thành công
+  // Chỉ xử lý giao dịch thành công
   if (data.type === "RECEIVE" && data.status === "SUCCESS") {
-    const transaction = {
-      bank: data.bank_short_name,
-      account: data.account_name,
-      amount: data.amount,
-      content: data.content,
-      time: data.transaction_time,
-      txn_id: data.txn_id,
-    };
-
-    console.log("💰 Giao dịch mới nhận:", transaction);
-
-    // 👉 TODO: xử lý logic của bạn ở đây
-    // Ví dụ:
-    // - Lưu vào database
-    // - Cộng tiền vào tài khoản người dùng theo content
-    // - Gửi thông báo Telegram hoặc Discord
+    const msg = `
+💸 *Giao dịch mới nhận được!*
+🏦 Ngân hàng: *${data.bank_short_name}*
+👤 Tên TK: *${data.account_name}*
+💰 Số tiền: *${data.amount.toLocaleString()} VND*
+📝 Nội dung: _${data.content}_
+🕒 Thời gian: ${data.transaction_time}
+🔖 Mã GD: \`${data.txn_id}\`
+    `;
+    console.log("💰 Thanh toán mới:", data);
+    await sendTelegramMessage(msg);
   }
 
   res.status(200).send("OK");
 });
 
-// ✅ Chạy server
+// Route kiểm tra server
+app.get("/", (req, res) => {
+  res.send("✅ API Sepay Webhook đang hoạt động và gửi Telegram!");
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🚀 Webhook Sepay đang chạy tại cổng ${PORT}`)
-);
+app.listen(PORT, () => console.log(`🚀 Server chạy cổng ${PORT}`));
