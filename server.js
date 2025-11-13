@@ -4,38 +4,50 @@ import crypto from "crypto";
 const app = express();
 app.use(express.json());
 
-// 🔑 Lấy secret key trong phần "API key" của Sepay
+// ✅ Thay bằng API Secret Key của bạn trên https://my.sepay.vn/api
 const SEPAY_SECRET = "YOUR_SEPAY_SECRET_KEY";
 
+// ✅ Route webhook
 app.post("/api/sepay/webhook", (req, res) => {
   const data = req.body;
   const signature = req.headers["x-sepay-signature"];
 
-  // ✅ Xác thực chữ ký
+  // ✅ Tạo hash để xác thực tính toàn vẹn
   const hash = crypto
     .createHmac("sha256", SEPAY_SECRET)
     .update(JSON.stringify(data))
     .digest("hex");
 
   if (hash !== signature) {
-    console.log("Sai chữ ký, bỏ qua!");
+    console.log("❌ Sai chữ ký, bỏ qua webhook không hợp lệ.");
     return res.status(401).send("Invalid signature");
   }
 
-  // ✅ Kiểm tra giao dịch thành công
+  // ✅ Xử lý khi có giao dịch thành công
   if (data.type === "RECEIVE" && data.status === "SUCCESS") {
-    console.log("📩 Thanh toán mới:", {
-      ngân_hàng: data.bank_short_name,
-      số_tiền: data.amount,
-      nội_dung: data.content,
-      mã_giao_dịch: data.txn_id,
-    });
+    const transaction = {
+      bank: data.bank_short_name,
+      account: data.account_name,
+      amount: data.amount,
+      content: data.content,
+      time: data.transaction_time,
+      txn_id: data.txn_id,
+    };
 
-    // 👉 TODO: Ở đây bạn xử lý logic riêng của mình
-    // Ví dụ: cộng tiền user, đánh dấu đơn hàng thanh toán thành công, lưu DB, v.v.
+    console.log("💰 Giao dịch mới nhận:", transaction);
+
+    // 👉 TODO: xử lý logic của bạn ở đây
+    // Ví dụ:
+    // - Lưu vào database
+    // - Cộng tiền vào tài khoản người dùng theo content
+    // - Gửi thông báo Telegram hoặc Discord
   }
 
   res.status(200).send("OK");
 });
 
-app.listen(3000, () => console.log("🚀 Webhook Sepay đang chạy trên cổng 3000"));
+// ✅ Chạy server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`🚀 Webhook Sepay đang chạy tại cổng ${PORT}`)
+);
