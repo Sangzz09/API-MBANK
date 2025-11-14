@@ -4,11 +4,11 @@ import fetch from "node-fetch";
 const app = express();
 app.use(express.json());
 
-// === CẤU HÌNH ===
+// ====== CẤU HÌNH TELEGRAM ======
 const TELEGRAM_BOT_TOKEN = "8364892217:AAFqXe7GYhDYzghcT9k1ZeNATuEUE-DIkYI";
 let groupChatId = null;
 
-// === LẮNG NGHE TELEGRAM (KHI BOT ĐƯỢC THÊM VÀO NHÓM) ===
+// ====== NHẬN TIN TỪ TELEGRAM (BOT ĐƯỢC THÊM VÀO NHÓM) ======
 app.post(`/api/telegram/${TELEGRAM_BOT_TOKEN}`, async (req, res) => {
   try {
     const data = req.body;
@@ -16,27 +16,29 @@ app.post(`/api/telegram/${TELEGRAM_BOT_TOKEN}`, async (req, res) => {
 
     const msg = data.message;
 
-    // Nếu bot được thêm vào nhóm hoặc /start trong nhóm
+    // Khi bot được thêm vào nhóm
     if (msg.chat && (msg.chat.type === "group" || msg.chat.type === "supergroup")) {
       groupChatId = msg.chat.id;
-      await sendTelegramMessage(`✅ Bot đã được kích hoạt trong nhóm: *${msg.chat.title}*`);
+      await sendTelegramMessage(`✅ Bot đã được kích hoạt trong nhóm *${msg.chat.title}*`);
     }
+
+    // Khi người dùng gõ /start
     if (msg.text?.startsWith("/start")) {
       groupChatId = msg.chat.id;
-      await sendTelegramMessage("🚀 Bot nhận thông báo SePay đã sẵn sàng hoạt động!");
+      await sendTelegramMessage("🚀 Bot thông báo SePay đã sẵn sàng hoạt động!");
     }
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ Telegram error:", err);
+    console.error("❌ Lỗi nhận Telegram:", err);
     res.sendStatus(500);
   }
 });
 
-// === GỬI TIN TELEGRAM ===
+// ====== HÀM GỬI TIN TELEGRAM ======
 async function sendTelegramMessage(text) {
   if (!groupChatId) {
-    console.log("⚠️ Chưa có nhóm Telegram để gửi tin!");
+    console.log("⚠️ Chưa có nhóm để gửi thông báo Telegram!");
     return;
   }
 
@@ -52,33 +54,49 @@ async function sendTelegramMessage(text) {
   });
 }
 
-// === WEBHOOK SEPAY ===
+// ====== WEBHOOK SEPAY ======
 app.post("/api/sepay/webhook", async (req, res) => {
   const data = req.body;
-  console.log("📩 Webhook SePay:", data);
+  console.log("📩 Dữ liệu Webhook SePay:", data);
 
+  // Chỉ xử lý giao dịch nhận tiền thành công
   if (data.type === "RECEIVE" && data.status === "SUCCESS") {
+
+    const jsonPhanHoi = {
+      ten_nguoi_gui: data.account_name || "Không rõ",
+      so_tien: data.amount || 0,
+      noi_dung: data.content || "Không có",
+      thoi_gian: data.transaction_time || new Date().toLocaleString(),
+      ma_giao_dich: data.txn_id || "Không có"
+    };
+
+    // ====== GỬI TIN TELEGRAM ======
     const msg = `
-💸 *Giao dịch mới!*
-🏦 Ngân hàng: *${data.bank_short_name || "MB Bank"}*
-👤 Tên TK: *${data.account_name || "TRAN MINH SANG"}*
-💰 Số tiền: *${data.amount?.toLocaleString()} VND*
-📝 Nội dung: _${data.content || "Không có"}_
-🕒 Thời gian: ${data.transaction_time || new Date().toLocaleString()}
-🔖 Mã GD: \`${data.txn_id || "Không có"}\`
+💸 *GIAO DỊCH MỚI!*
+👤 Người gửi: *${jsonPhanHoi.ten_nguoi_gui}*
+💰 Số tiền: *${jsonPhanHoi.so_tien.toLocaleString()} VND*
+📝 Nội dung: _${jsonPhanHoi.noi_dung}_
+🕒 Thời gian: ${jsonPhanHoi.thoi_gian}
+🔖 Mã giao dịch: \`${jsonPhanHoi.ma_giao_dich}\`
     `;
+
     await sendTelegramMessage(msg);
+
+    // ====== TRẢ JSON VỀ CHO CLIENT ======
+    return res.status(200).json(jsonPhanHoi);
   }
 
   res.status(200).send("OK");
 });
 
-// Kiểm tra
-app.get("/", (_, res) => res.send("✅ API SePay Webhook đang hoạt động!"));
+// ====== KIỂM TRA SERVER ======
+app.get("/", (_, res) => {
+  res.send("✅ API Webhook SePay đang hoạt động!");
+});
 
-// Start server
+// ====== KHỞI ĐỘNG SERVER ======
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server chạy trên cổng ${PORT}`);
+  console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
   console.log(`🌐 URL: https://api-mbank.onrender.com`);
 });
