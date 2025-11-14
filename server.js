@@ -11,10 +11,10 @@ app.use(express.json());
 const TELEGRAM_BOT_TOKEN = "8364892217:AAFqXe7GYhDYzghcT9k1ZeNATuEUE-DIkYI";
 let groupChatId = null;
 
+// =======================================================
 // Lưu giao dịch
+// =======================================================
 let lastTransaction = null;
-
-// File lưu lịch sử
 const HISTORY_FILE = "history.json";
 
 function saveHistory(data) {
@@ -27,7 +27,7 @@ function saveHistory(data) {
 }
 
 // =======================================================
-//          LẮNG NGHE TELEGRAM (BOT VÀO NHÓM)
+// LẮNG NGHE TELEGRAM
 // =======================================================
 app.post(`/api/telegram/${TELEGRAM_BOT_TOKEN}`, async (req, res) => {
   try {
@@ -54,7 +54,7 @@ app.post(`/api/telegram/${TELEGRAM_BOT_TOKEN}`, async (req, res) => {
 });
 
 // =======================================================
-//                     GỬI TELEGRAM
+// GỬI TIN TELEGRAM
 // =======================================================
 async function sendTelegramMessage(text) {
   if (!groupChatId) {
@@ -75,7 +75,7 @@ async function sendTelegramMessage(text) {
 }
 
 // =======================================================
-//                      WEBHOOK SEPAY
+// WEBHOOK SEPAY
 // =======================================================
 app.post("/api/sepay/webhook", async (req, res) => {
   const data = req.body;
@@ -83,7 +83,7 @@ app.post("/api/sepay/webhook", async (req, res) => {
   console.log("📩 Webhook SePay:", data);
 
   if (data.type === "RECEIVE" && data.status === "SUCCESS") {
-    
+
     const giaoDich = {
       ten_nguoi_gui: data.account_name || "Không có",
       so_tien: data.amount || 0,
@@ -113,23 +113,39 @@ app.post("/api/sepay/webhook", async (req, res) => {
 });
 
 // =======================================================
-//                API HIỂN THỊ JSON TRÊN WEB
+// ENDPOINT TEST WEBHOOK
 // =======================================================
+app.get("/api/sepay/webhook/test", (req, res) => {
+  const testData = {
+    ten_nguoi_gui: "TEST NGUOI GUI",
+    so_tien: 123456,
+    noi_dung: "NAP TEST",
+    thoi_gian: new Date().toLocaleString(),
+    ma_giao_dich: "TEST123"
+  };
 
-// JSON giao dịch mới nhất
+  lastTransaction = testData;
+  saveHistory(testData);
+
+  res.setHeader("Content-Type", "application/json");
+  res.send(JSON.stringify(testData, null, 4));
+});
+
+// =======================================================
+// HIỂN THỊ GIAO DỊCH MỚI NHẤT
+// =======================================================
 app.get("/giaodich", (req, res) => {
-  if (!lastTransaction) {
-    return res.json({ message: "Chưa có giao dịch!" });
-  }
+  if (!lastTransaction) return res.json({ message: "Chưa có giao dịch!" });
 
   res.setHeader("Content-Type", "application/json");
   res.send(JSON.stringify(lastTransaction, null, 4));
 });
 
-// JSON lịch sử
+// =======================================================
+// HIỂN THỊ TOÀN BỘ LỊCH SỬ
+// =======================================================
 app.get("/history", (req, res) => {
-  if (!fs.existsSync(HISTORY_FILE))
-    return res.json([]);
+  if (!fs.existsSync(HISTORY_FILE)) return res.json([]);
 
   const history = JSON.parse(fs.readFileSync(HISTORY_FILE));
   res.setHeader("Content-Type", "application/json");
@@ -137,12 +153,12 @@ app.get("/history", (req, res) => {
 });
 
 // =======================================================
-//                        CHECK SERVER
+// CHECK SERVER
 // =======================================================
 app.get("/", (_, res) => res.send("✅ API SePay Webhook + Telegram đang hoạt động!"));
 
 // =======================================================
-//                        START SERVER
+// START SERVER
 // =======================================================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
