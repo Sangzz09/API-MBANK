@@ -1,24 +1,18 @@
 {
   "name": "sepay-webhook",
   "version": "1.0.0",
+  "description": "Sepay Webhook API for MB Bank",
   "main": "server.js",
+  
   "scripts": {
     "start": "node server.js"
   },
+
+  "engines": {
+    "node": ">=18.0.0"
+  },
+
   "dependencies": {
     "express": "^4.18.2"
   }
 }
-```
-
-3. Nếu sai, click ✏️ để sửa
-
-### Bước 4: Đợi Render redeploy
-- Quay lại **Render Dashboard**
-- Xem tab **Logs**
-- Đợi build xong (2-3 phút)
-- Bạn sẽ thấy:
-```
-🚀 SEPAY WEBHOOK API ĐANG CHẠY
-📡 Port: 10000
-🔗 Webhook: /api/sepay/webhook
