@@ -1,14 +1,13 @@
 {
-  "name": "sepay-webhook-api",
+  "name": "sepay-api",
   "version": "1.0.0",
-  "description": "API webhook SePay + PostgreSQL chạy Render",
-  "main": "server.js",
   "type": "module",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "pg": "^8.11.3"
+    "express": "4.19.2",
+    "pg": "8.11.3"
   }
 }
