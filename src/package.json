@@ -1,29 +1,24 @@
 {
-  "name": "sepay-webhook-mbank",
+  "name": "sepay-webhook",
   "version": "1.0.0",
-  "description": "Sepay Webhook API for MBank - Nhận thông báo giao dịch real-time",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server.js"
   },
-  "keywords": [
-    "sepay",
-    "webhook",
-    "mbank",
-    "payment",
-    "banking"
-  ],
-  "author": "Your Name",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
   }
 }
+```
+
+3. Nếu sai, click ✏️ để sửa
+
+### Bước 4: Đợi Render redeploy
+- Quay lại **Render Dashboard**
+- Xem tab **Logs**
+- Đợi build xong (2-3 phút)
+- Bạn sẽ thấy:
+```
+🚀 SEPAY WEBHOOK API ĐANG CHẠY
+📡 Port: 10000
+🔗 Webhook: /api/sepay/webhook
