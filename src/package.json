@@ -1,10 +1,10 @@
 {
-  "name": "sepay-webhook-api",
+  "name": "mbank-bot",
   "version": "1.0.0",
-  "description": "Sepay Webhook API for Mbank",
-  "main": "index.js",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2"
