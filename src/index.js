@@ -1,4 +1,4 @@
-// index.js
+// server.js - CommonJS format (không cần type: "module")
 const express = require('express');
 const app = express();
 
@@ -7,13 +7,13 @@ app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware log tất cả requests
+// Middleware log
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
-// Health check endpoint
+// Health check
 app.get('/', (req, res) => {
   res.json({ 
     status: 'running',
@@ -30,7 +30,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy' });
 });
 
-// Endpoint nhận webhook từ Sepay
+// Webhook endpoint
 app.post('/api/sepay/webhook', async (req, res) => {
   try {
     console.log('\n========================================');
@@ -42,7 +42,6 @@ app.post('/api/sepay/webhook', async (req, res) => {
 
     const data = req.body;
 
-    // Validate có dữ liệu không
     if (!data || Object.keys(data).length === 0) {
       console.log('⚠️  Không có dữ liệu');
       return res.status(400).json({ 
@@ -52,7 +51,16 @@ app.post('/api/sepay/webhook', async (req, res) => {
     }
 
     // Parse thông tin giao dịch
-    const transaction = parseTransaction(data);
+    const transaction = {
+      id: data.id || data.transaction_id || 'N/A',
+      bank: data.gateway || data.bank_brand_name || 'MBBank',
+      date: data.transaction_date || data.when || new Date().toISOString(),
+      accountNumber: data.account_number || '',
+      amount: parseFloat(data.amount_in || data.transferAmount || 0),
+      content: data.transaction_content || data.description || data.transferContent || '',
+      referenceNumber: data.reference_number || data.code || '',
+      accumulated: parseFloat(data.accumulated || 0)
+    };
     
     console.log('💰 Thông tin giao dịch:');
     console.log(`   - ID: ${transaction.id}`);
@@ -68,7 +76,6 @@ app.post('/api/sepay/webhook', async (req, res) => {
       console.log('ℹ️  Giao dịch tiền ra - bỏ qua');
     }
 
-    // Phản hồi thành công về Sepay (QUAN TRỌNG!)
     res.status(200).json({ 
       success: true,
       message: 'Đã nhận và xử lý webhook',
@@ -77,8 +84,6 @@ app.post('/api/sepay/webhook', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Lỗi xử lý webhook:', error);
-    
-    // Vẫn phải trả về 200 để Sepay không retry
     res.status(200).json({ 
       success: false,
       message: 'Có lỗi xảy ra',
@@ -87,89 +92,41 @@ app.post('/api/sepay/webhook', async (req, res) => {
   }
 });
 
-// Parse dữ liệu từ Sepay (có nhiều format khác nhau)
-function parseTransaction(data) {
-  return {
-    id: data.id || data.transaction_id || 'N/A',
-    bank: data.gateway || data.bank_brand_name || 'MBBank',
-    date: data.transaction_date || data.when || new Date().toISOString(),
-    accountNumber: data.account_number || '',
-    amount: parseFloat(data.amount_in || data.transferAmount || 0),
-    content: data.transaction_content || data.description || data.transferContent || '',
-    referenceNumber: data.reference_number || data.code || '',
-    accumulated: parseFloat(data.accumulated || 0)
-  };
-}
-
 // Xử lý thanh toán
 async function handlePayment(transaction) {
   console.log('\n💳 BẮT ĐẦU XỬ LÝ THANH TOÁN');
   
-  // Tìm mã đơn hàng trong nội dung
   const orderCode = findOrderCode(transaction.content);
   
   if (orderCode) {
     console.log(`✅ Tìm thấy mã đơn: ${orderCode}`);
-    
-    // XỬ LÝ ĐƠN HÀNG Ở ĐÂY
-    // ========================
-    
-    // Ví dụ: Cập nhật database
-    // await updateOrder(orderCode, {
-    //   status: 'paid',
-    //   paidAmount: transaction.amount,
-    //   transactionId: transaction.id,
-    //   paidAt: new Date()
-    // });
-    
-    // Ví dụ: Gửi email xác nhận
-    // await sendEmail({
-    //   to: 'customer@email.com',
-    //   subject: `Đơn hàng ${orderCode} đã thanh toán`,
-    //   body: `Số tiền: ${transaction.amount.toLocaleString('vi-VN')} VND`
-    // });
-    
-    // Ví dụ: Gửi notification
-    // await sendNotification({
-    //   title: 'Thanh toán thành công',
-    //   message: `Đơn hàng ${orderCode} - ${transaction.amount} VND`
-    // });
-    
     console.log(`📝 Đã xử lý đơn hàng: ${orderCode}`);
-    
   } else {
     console.log('⚠️  Không tìm thấy mã đơn hàng trong nội dung');
     console.log(`   Nội dung: "${transaction.content}"`);
   }
   
-  // Lưu log giao dịch
   saveLog(transaction, orderCode);
-  
   console.log('✅ HOÀN TẤT XỬ LÝ\n');
 }
 
-// Tìm mã đơn hàng từ nội dung chuyển khoản
+// Tìm mã đơn hàng
 function findOrderCode(content) {
   if (!content) return null;
   
-  // Loại bỏ dấu và chuyển thành chữ thường để tìm dễ hơn
-  const normalized = content.toLowerCase().trim();
-  
-  // Các pattern thường gặp
   const patterns = [
-    /dh[\s-]?(\d+)/i,        // DH12345, DH-12345, DH 12345
-    /ma[\s-]?don[\s-]?(\d+)/i, // ma don 12345
-    /order[\s-]?(\d+)/i,     // ORDER12345
-    /md[\s-]?(\d+)/i,        // MD12345
-    /#(\d+)/,                // #12345
-    /ma[\s-]?(\d+)/i,        // ma 12345
-    /(\d{5,})/               // 5 số trở lên
+    /dh[\s-]?(\d+)/i,
+    /ma[\s-]?don[\s-]?(\d+)/i,
+    /order[\s-]?(\d+)/i,
+    /md[\s-]?(\d+)/i,
+    /#(\d+)/,
+    /ma[\s-]?(\d+)/i,
+    /(\d{5,})/
   ];
   
   for (const pattern of patterns) {
     const match = content.match(pattern);
     if (match) {
-      // Lấy nhóm số hoặc toàn bộ match
       return match[1] || match[0];
     }
   }
@@ -177,7 +134,7 @@ function findOrderCode(content) {
   return null;
 }
 
-// Lưu log giao dịch
+// Lưu log
 function saveLog(transaction, orderCode) {
   const log = {
     timestamp: new Date().toISOString(),
@@ -190,9 +147,6 @@ function saveLog(transaction, orderCode) {
   };
   
   console.log('📄 Log:', JSON.stringify(log));
-  
-  // TODO: Lưu vào database hoặc file
-  // await db.logs.insert(log);
 }
 
 // 404 handler
@@ -209,7 +163,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('💥 Lỗi không xử lý được:', err);
+  console.error('💥 Lỗi:', err);
   res.status(500).json({ 
     error: 'Lỗi server',
     message: err.message 
@@ -227,7 +181,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('═══════════════════════════════════════════\n');
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('\n👋 Đang tắt server...');
   process.exit(0);
