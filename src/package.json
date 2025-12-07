@@ -1,15 +1,29 @@
 {
-  "name": "mbank-bot",
+  "name": "sepay-webhook-mbank",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Sepay Webhook API for MBank - Nhận thông báo giao dịch real-time",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
+  "keywords": [
+    "sepay",
+    "webhook",
+    "mbank",
+    "payment",
+    "banking"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2"
   },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
