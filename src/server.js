@@ -3,13 +3,11 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-// middleware
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ================================
-// HOME
-// ================================
+// Home
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -18,47 +16,35 @@ app.get("/", (req, res) => {
   });
 });
 
-// ================================
-// WEBHOOK SEPAY (NO TOKEN)
-// ================================
+// Webhook Sepay
 app.post("/api/sepay/webhook", (req, res) => {
-  console.log("=== WEBHOOK SEPAY ===");
 
-  const data = req.body;
+  console.log("=== WEBHOOK NHAN ===");
+  console.log(JSON.stringify(req.body, null, 2));
 
-  if (!data) {
-    return res.status(400).json({
-      success: false,
-      message: "No data received"
-    });
-  }
+  const d = req.body;
 
-  // LẤY THÔNG TIN GIAO DỊCH
-  const giao_dich = {
-    id: data.id || null,                                 // Mã giao dịch
-    so_tien_vao: data.amount_in || 0,                    // Số tiền vào
-    so_tien_ra: data.amount_out || 0,                    // Số tiền ra
-    noi_dung: data.transaction_content || "",            // Nội dung CK
-    thoi_gian: data.transaction_date || "",              // Thời gian
-    ma_tham_chieu: data.reference_number || "",          // Mã tham chiếu
-    so_tk: data.account_number || "",
-    raw: data                                            // toàn bộ data
+  const giaoDich = {
+    id: d.id || d.transaction_id || "",
+    so_tien_vao: Number(d.amount_in || 0),
+    so_tien_ra: Number(d.amount_out || 0),
+    noi_dung: d.transaction_content || "",
+    thoi_gian: d.transaction_date || "",
+    ma_tham_chieu: d.reference_number || "",
+    so_tk: d.account_number || "",
+    raw: d
   };
 
-  console.log("Dữ liệu giao dịch:", giao_dich);
+  console.log("➜ Parsed:", giaoDich);
 
-  // Trả về OK cho Sepay
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
-    message: "Webhook received",
-    data: giao_dich
+    message: "Webhook OK",
+    data: giaoDich
   });
 });
 
-// ================================
-// SERVER LISTEN
-// ================================
+// Run server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("🚀 SERVER RUNNING ON PORT", PORT);
+  console.log("🚀 SERVER STARTED ON PORT", PORT);
 });
-
