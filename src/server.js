@@ -1,46 +1,77 @@
-import express from "express";
-import pkg from "pg";
-
-const { Pool } = pkg;
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
 
-// =======================
-// DATABASE (Render)
-// =======================
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
+app.use(cors());
+app.use(bodyParser.json());
 
-// =======================
-// WEBHOOK SEPAY
-// =======================
-app.post("/webhook/sepay", async (req, res) => {
+// --- ROUTE NHẬN WEBHOOK TỪ SEPAY ---
+app.post('/api/sepay/webhook', async (req, res) => {
     try {
+        // Lấy toàn bộ dữ liệu SePay gửi sang
         const data = req.body;
 
-        console.log("📌 Webhook nhận:", data);
+        // --- 1. TRÍCH XUẤT 4 THÔNG TIN BẠN CẦN ---
+        
+        // Số tiền (transferAmount)
+        const soTien = data.transferAmount; 
 
-        // Lưu giao dịch
-        await pool.query(
-            `INSERT INTO transactions (tran_id, amount, description, time)
-             VALUES ($1, $2, $3, NOW())`,
-            [data.tranId, data.amount, data.description]
-        );
+        // Nội dung (transferContent) - VD: "NAP MINHSANG"
+        const noiDung = data.transferContent; 
 
-        res.status(200).send("OK");
-    } catch (err) {
-        console.error("❌ Lỗi:", err);
-        res.status(500).send("FAIL");
+        // Thời gian (transactionDate) - VD: "2025-12-09 19:00:00"
+        const thoiGian = data.transactionDate; 
+
+        // Mã đơn/Mã giao dịch ngân hàng (referenceCode) - VD: "FT233..."
+        const maDon = data.referenceCode; 
+
+
+        // --- 2. LOG RA MÀN HÌNH ĐỂ KIỂM TRA (Trên Render Logs) ---
+        console.log("--------------------------------");
+        console.log("🔥 CÓ GIAO DỊCH MỚI!");
+        console.log(`💰 Số tiền:   ${soTien} VNĐ`);
+        console.log(`📝 Nội dung:  ${noiDung}`);
+        console.log(`⏰ Thời gian: ${thoiGian}`);
+        console.log(`🧾 Mã đơn:    ${maDon}`);
+        console.log("--------------------------------");
+
+
+        // --- 3. XỬ LÝ LOGIC CỘNG TIỀN (VÍ DỤ) ---
+        // Tại đây bạn viết code lưu vào database
+        
+        // Ví dụ: Kiểm tra nếu nội dung có chứa "minhsang"
+        if (noiDung && noiDung.toLowerCase().includes("minhsang")) {
+            console.log(`=> Đang cộng ${soTien} cho user MinhSang...`);
+            // Code update database ở đây...
+        }
+
+
+        // --- 4. TRẢ VỀ KẾT QUẢ CHO SEPAY (BẮT BUỘC) ---
+        return res.status(200).json({
+            success: true,
+            message: 'Đã nhận thông tin thành công',
+            data_received: {
+                amount: soTien,
+                content: noiDung,
+                time: thoiGian,
+                code: maDon
+            }
+        });
+
+    } catch (error) {
+        console.error("Lỗi:", error);
+        return res.status(200).json({ success: false, message: 'Có lỗi xảy ra' });
     }
 });
 
-// =======================
-app.get("/", (req, res) => {
-    res.send("SePay API is running.");
+// Route kiểm tra server
+app.get('/', (req, res) => {
+    res.send('API SePay đang chạy ngon lành!');
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("🚀 Server chạy cổng", PORT));
+app.listen(PORT, () => {
+    console.log(`Server chạy tại port ${PORT}`);
+});
