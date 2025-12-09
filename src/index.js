@@ -8,68 +8,101 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// --- ROUTE NHẬN WEBHOOK TỪ SEPAY ---
+// --- KHU VỰC LƯU TRỮ TẠM THỜI ---
+// Lưu ý: Vì dùng gói Free, nếu server khởi động lại thì danh sách này sẽ bị reset.
+// Để lưu vĩnh viễn cần dùng Database (Mongo, SQL), nhưng hiện tại dùng cái này là chạy ổn.
+let lichSuGiaoDich = []; 
+
+// ============================================
+// 1. API NHẬN THÔNG BÁO TỪ SEPAY (WEBHOOK)
+// ============================================
 app.post('/api/sepay/webhook', async (req, res) => {
     try {
-        // Lấy toàn bộ dữ liệu SePay gửi sang
         const data = req.body;
 
-        // --- 1. TRÍCH XUẤT 4 THÔNG TIN BẠN CẦN ---
-        
-        // Số tiền (transferAmount)
-        const soTien = data.transferAmount; 
+        // Lấy thông tin quan trọng
+        const giaoDichMoi = {
+            id: data.id, // ID giao dịch của SePay
+            amount: data.transferAmount, // Số tiền
+            content: data.transferContent, // Nội dung khách ghi
+            date: data.transactionDate, // Thời gian
+            bank_code: data.referenceCode // Mã tham chiếu
+        };
 
-        // Nội dung (transferContent) - VD: "NAP MINHSANG"
-        const noiDung = data.transferContent; 
+        // --- LƯU VÀO DANH SÁCH ---
+        // Không cần check chữ "minhsang" nữa, có tiền là lưu hết.
+        lichSuGiaoDich.push(giaoDichMoi);
 
-        // Thời gian (transactionDate) - VD: "2025-12-09 19:00:00"
-        const thoiGian = data.transactionDate; 
-
-        // Mã đơn/Mã giao dịch ngân hàng (referenceCode) - VD: "FT233..."
-        const maDon = data.referenceCode; 
-
-
-        // --- 2. LOG RA MÀN HÌNH ĐỂ KIỂM TRA (Trên Render Logs) ---
+        // In ra log để bạn xem trên Render
         console.log("--------------------------------");
-        console.log("🔥 CÓ GIAO DỊCH MỚI!");
-        console.log(`💰 Số tiền:   ${soTien} VNĐ`);
-        console.log(`📝 Nội dung:  ${noiDung}`);
-        console.log(`⏰ Thời gian: ${thoiGian}`);
-        console.log(`🧾 Mã đơn:    ${maDon}`);
+        console.log("💰 NHẬN ĐƯỢC TIỀN!");
+        console.log(`- Khách ghi: ${giaoDichMoi.content}`);
+        console.log(`- Số tiền:   ${giaoDichMoi.amount} VNĐ`);
         console.log("--------------------------------");
 
-
-        // --- 3. XỬ LÝ LOGIC CỘNG TIỀN (VÍ DỤ) ---
-        // Tại đây bạn viết code lưu vào database
-        
-        // Ví dụ: Kiểm tra nếu nội dung có chứa "minhsang"
-        if (noiDung && noiDung.toLowerCase().includes("minhsang")) {
-            console.log(`=> Đang cộng ${soTien} cho user MinhSang...`);
-            // Code update database ở đây...
-        }
-
-
-        // --- 4. TRẢ VỀ KẾT QUẢ CHO SEPAY (BẮT BUỘC) ---
-        return res.status(200).json({
-            success: true,
-            message: 'Đã nhận thông tin thành công',
-            data_received: {
-                amount: soTien,
-                content: noiDung,
-                time: thoiGian,
-                code: maDon
-            }
-        });
+        // Báo cho SePay biết là đã nhận OK
+        return res.status(200).json({ success: true, message: 'Updated' });
 
     } catch (error) {
         console.error("Lỗi:", error);
-        return res.status(200).json({ success: false, message: 'Có lỗi xảy ra' });
+        return res.status(200).json({ success: false });
     }
 });
 
-// Route kiểm tra server
+// ============================================
+// 2. API CHO MENU/TOOL KIỂM TRA (CHECK PAYMENT)
+// ============================================
+// Menu game sẽ gọi vào đây để hỏi: "Thằng user123 đã nạp chưa?"
+app.get('/api/check-payment', (req, res) => {
+    
+    // Lấy nội dung mà Menu Game gửi lên để tìm
+    const noiDungCanTim = req.query.content; 
+
+    if (!noiDungCanTim) {
+        return res.json({ status: false, message: "Thiếu nội dung cần tìm (content)" });
+    }
+
+    // --- THUẬT TOÁN TÌM KIẾM ---
+    // Tìm trong lịch sử xem có giao dịch nào CHỨA nội dung đó không
+    // (Dùng toLowerCase để không phân biệt hoa thường)
+    const ketQua = lichSuGiaoDich.find(gd => 
+        gd.content.toLowerCase().includes(noiDungCanTim.toLowerCase())
+    );
+
+    if (ketQua) {
+        // ==> ĐÃ TÌM THẤY GIAO DỊCH
+        res.json({
+            status: true,
+            message: "Thanh toán thành công",
+            data: {
+                amount: ketQua.amount,
+                content: ketQua.content,
+                time: ketQua.date
+            }
+        });
+    } else {
+        // ==> CHƯA THẤY
+        res.json({
+            status: false,
+            message: "Chưa tìm thấy giao dịch nào khớp"
+        });
+    }
+});
+
+// ============================================
+// 3. API KIỂM TRA LỊCH SỬ (XEM TẤT CẢ)
+// ============================================
+// Vào link này để xem danh sách các đơn đã nạp
+app.get('/api/history', (req, res) => {
+    res.json({
+        total: lichSuGiaoDich.length,
+        transactions: lichSuGiaoDich
+    });
+});
+
+// Trang chủ
 app.get('/', (req, res) => {
-    res.send('API SePay đang chạy ngon lành!');
+    res.send('Server Auto Bank Minhsang đang chạy!');
 });
 
 app.listen(PORT, () => {
